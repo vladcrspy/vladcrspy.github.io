@@ -16,7 +16,7 @@
             position: absolute;
             top: 0;
             left: 50%;
-            /* УДАЛЕНО: margin-left: -15px; */
+            /* Удален margin-left для надежного центрирования через transform */
             transform-origin: 50% 100%; 
         }
         
@@ -47,11 +47,26 @@
     <div id="game-container" class="max-w-md mx-auto">
         <h1 class="text-3xl font-bold text-center mb-6 text-red-500">Шпион по Карте CR</h1>
         
-        <div id="setup-screen" class="bg-gray-800 p-6 rounded-lg shadow-xl">
+        <div id="mode-selection-screen" class="bg-gray-800 p-6 rounded-lg shadow-xl">
+            <h2 class="text-2xl font-bold mb-4 text-yellow-400">Выберите режим</h2>
+            <p class="mb-6 text-gray-400">Сперва выберите, хотите ли вы играть с сюрпризами.</p>
+            
+            <button onclick="selectGameMode('CLASSIC')" class="w-full py-4 mb-4 bg-red-600 hover:bg-red-700 rounded-md font-bold transition duration-150">
+                <span class="text-xl">Классический режим</span><br>
+                <span class="text-sm">Всегда 1 шпион.</span>
+            </button>
+            
+            <button onclick="selectGameMode('FUNNY')" class="w-full py-4 bg-green-600 hover:bg-green-700 rounded-md font-bold transition duration-150">
+                <span class="text-xl">Режим с приколами</span><br>
+                <span class="text-sm">10% шанс на Всех Шпионов / Всех Мирных.</span>
+            </button>
+        </div>
+
+        <div id="setup-screen" class="hidden bg-gray-800 p-6 rounded-lg shadow-xl">
             <h2 class="text-xl font-semibold mb-4">⚙️ Настройка</h2>
             <label for="player-count" class="block text-sm font-medium mb-2">Количество игроков (мин. 3):</label>
             <input type="number" id="player-count" min="3" value="4" class="w-full p-3 mb-4 rounded-md bg-gray-700 text-white border-none focus:ring-red-500 focus:border-red-500">
-            <button onclick="startGameSetup()" class="w-full py-3 bg-red-600 hover:bg-red-700 rounded-md font-bold transition duration-150">Начать игру</button>
+            <button onclick="startGameSetup()" class="w-full py-3 bg-red-600 hover:bg-red-700 rounded-md font-bold transition duration-150">Продолжить</button>
         </div>
 
         <div id="spinner-screen" class="hidden bg-gray-800 p-6 rounded-lg shadow-xl text-center">
@@ -94,7 +109,7 @@
         <div id="game-start-screen" class="hidden bg-gray-800 p-6 rounded-lg shadow-xl text-center">
             <h2 class="text-4xl font-extrabold text-green-400 mt-10 mb-8">⚔️ ИГРА НАЧАЛАСЬ!</h2>
             <p class="text-lg mb-8">Обсуждайте карту, не называя ее. Порядок игры: по номерам, начиная с Игрока №1.</p>
-            <button onclick="showScreen('results-screen')" class="py-2 px-6 bg-red-800 hover:bg-red-900 rounded-md text-sm font-semibold">
+            <button onclick="showResults()" class="py-2 px-6 bg-red-800 hover:bg-red-900 rounded-md text-sm font-semibold">
                 Показать результаты (Секрет)
             </button>
         </div>
@@ -103,7 +118,7 @@
             <h2 class="text-3xl font-extrabold mb-4 text-red-500">🎉 РЕЗУЛЬТАТЫ РАУНДА</h2>
             <p class="text-lg mb-2">Секретная карта:</p>
             <p id="final-card" class="text-4xl font-bold mb-4 text-green-400"></p>
-            <p class="text-lg mb-2">Шпион:</p>
+            <p class="text-lg mb-2" id="final-spy-title">Шпион:</p>
             <p id="final-spy" class="text-4xl font-bold mb-8 text-yellow-400"></p>
             <button onclick="window.location.reload()" class="w-full py-3 bg-red-600 hover:bg-red-700 rounded-md font-bold transition duration-150">
                 Новая игра (Полный сброс)
@@ -112,7 +127,7 @@
     </div>
 
     <script>
-        // --- 1. СПИСОК КАРТ С ТОЧНЫМИ СЛАГАМИ ДЛЯ КАРТИНОК (ОБНОВЛЕНО) ---
+        // --- 1. СПИСОК КАРТ С ТОЧНЫМИ СЛАГАМИ ДЛЯ КАРТИНОК ---
         const CARDS_DATA = [
             { ru: "Три мушкетера", slug: "3M" },
             { ru: "Голем", slug: "Golem" },
@@ -238,15 +253,15 @@
 
         // Глобальные переменные состояния игры
         let playerCount = 0;
-        let spyIndex = -1; 
+        let spyIndex = -2; 
         let secretCardData = {}; 
         let currentPlayerIndex = 1;
         let roles = {}; 
+        let gameModeSetting = 'FUNNY'; // Инициализируем, но фактически устанавливается через selectGameMode
 
         // --- Функция для получения ссылки на изображение ---
         function getCardImage(slug) {
             const baseUrl = "https://www.deckshop.pro/img/c/";
-            // Ссылка на общую рубашку карты, если картинка не найдена
             const fallbackUrl = "https://www.deckshop.pro/img/misc/card_back.png"; 
 
             if (!slug) return fallbackUrl;
@@ -256,11 +271,17 @@
 
         // --- Управление экранами ---
         function showScreen(screenId) {
-            const screens = ['setup-screen', 'spinner-screen', 'role-distribution-screen', 'game-start-screen', 'results-screen'];
+            const screens = ['mode-selection-screen', 'setup-screen', 'spinner-screen', 'role-distribution-screen', 'game-start-screen', 'results-screen'];
             screens.forEach(id => {
                 document.getElementById(id).classList.add('hidden');
             });
             document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        // --- НОВАЯ ФУНКЦИЯ: ВЫБОР РЕЖИМА ---
+        function selectGameMode(mode) {
+            gameModeSetting = mode;
+            showScreen('setup-screen');
         }
         
         // --- 1. НАСТРОЙКА ИГРЫ ---
@@ -280,14 +301,40 @@
             showScreen('spinner-screen');
         }
 
-        // --- ЛОГИКА ЖЕРЕБЬЕВКИ ---
+        // --- ЛОГИКА ЖЕРЕБЬЕВКИ (ОБНОВЛЕНО ДЛЯ РЕЖИМОВ) ---
         function setupGameLogic() {
             secretCardData = CARDS_DATA[Math.floor(Math.random() * CARDS_DATA.length)];
-            spyIndex = Math.floor(Math.random() * playerCount) + 1;
             
+            let gameMode = "NORMAL";
+            
+            if (gameModeSetting === 'FUNNY') {
+                // 10% шанс на спец. раунд, только если выбран режим FUNNY
+                const modeRoll = Math.random();
+                
+                if (modeRoll < 0.05) { // 5% шанс
+                    gameMode = "ALL_SPIES";
+                } else if (modeRoll < 0.10) { // 5% шанс
+                    gameMode = "ALL_LOCALS";
+                }
+            }
+
             roles = {};
-            for (let i = 1; i <= playerCount; i++) {
-                roles[i] = (i === spyIndex) ? "ШПИОН" : secretCardData;
+            
+            if (gameMode === "ALL_SPIES") {
+                spyIndex = 0; // Специальный индекс: Все шпионы
+                for (let i = 1; i <= playerCount; i++) {
+                    roles[i] = "ШПИОН";
+                }
+            } else if (gameMode === "ALL_LOCALS") {
+                spyIndex = -1; // Специальный индекс: Нет шпиона
+                for (let i = 1; i <= playerCount; i++) {
+                    roles[i] = secretCardData;
+                }
+            } else { // NORMAL mode (включая CLASSIC режим)
+                spyIndex = Math.floor(Math.random() * playerCount) + 1;
+                for (let i = 1; i <= playerCount; i++) {
+                    roles[i] = (i === spyIndex) ? "ШПИОН" : secretCardData;
+                }
             }
         }
         
@@ -317,7 +364,7 @@
             }, 4000); 
         }
 
-        // --- 3. РАЗДАЧА РОЛЕЙ (СЕТКА) ---
+        // --- 3. РАЗДАЧА РОЛЕЙ (СЕТКА) и updateCardAccessibility ---
         function startRoleDistribution() {
             currentPlayerIndex = 1; 
             
@@ -414,8 +461,34 @@
             } else {
                 // 5. ИГРА НАЧАЛАСЬ
                 showScreen('game-start-screen');
-                document.getElementById('final-card').textContent = secretCardData.ru;
-                document.getElementById('final-spy').textContent = `Игрок №${spyIndex}`;
+            }
+        }
+        
+        // --- 6. ПОКАЗАТЬ РЕЗУЛЬТАТЫ ---
+        function showResults() {
+            showScreen('results-screen');
+            
+            document.getElementById('final-card').textContent = secretCardData.ru;
+
+            const finalSpyTitle = document.getElementById('final-spy-title');
+            const finalSpyContent = document.getElementById('final-spy');
+            
+            // Проверка специальных режимов
+            if (spyIndex === 0) { // Все Шпионы
+                finalSpyTitle.textContent = `ШПИОНЫ:`;
+                finalSpyContent.textContent = `ВСЕ ИГРОКИ!`;
+                finalSpyContent.classList.add('text-red-500');
+                finalSpyContent.classList.remove('text-yellow-400', 'text-green-400');
+            } else if (spyIndex === -1) { // Все Мирные
+                finalSpyTitle.textContent = `ШПИОН:`;
+                finalSpyContent.textContent = `НЕТ ШПИОНА`;
+                finalSpyContent.classList.add('text-green-400');
+                finalSpyContent.classList.remove('text-yellow-400', 'text-red-500');
+            } else { // Обычный режим
+                finalSpyTitle.textContent = `Шпион:`;
+                finalSpyContent.textContent = `Игрок №${spyIndex}`;
+                finalSpyContent.classList.add('text-yellow-400');
+                finalSpyContent.classList.remove('text-red-500', 'text-green-400');
             }
         }
     </script>
